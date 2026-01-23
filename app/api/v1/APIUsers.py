@@ -2,8 +2,7 @@ from fastapi import APIRouter
 
 from app.Schemas.UsersSchema import UsersRegistration, UsersUpdata
 from app.DataBase.database import SessionDepend
-# from app.Models.models import UsersModel
-from app.Servises.users_servises import create, get_by_id, get_all_id, delete, update
+from app.Servises.users_servises import create, get_by_id, get_all_id, delete, update, authorization
 
 router = APIRouter(
     prefix="/api/users/v1",
@@ -11,15 +10,15 @@ router = APIRouter(
 )
 
 @router.post("/registration/")
-async def registration(user: UsersRegistration, session: SessionDepend,):
-    new_user = await create(session=session, schema=user.model_dump())
+async def registration(user: UsersRegistration, session: SessionDepend):
+    new_user = await create(session=session, schema=user)
     return {"detail": new_user}
 
 
-# @router.post("/authorization/")
-# async def authorizations(session: SessionDepend, user=UsersRegistration):
-#     user = authorization_user(session=session, user=user)
-#     return {"detail": "Succes"}
+@router.post("/authorization")
+async def authorization_user(user: UsersRegistration, session: SessionDepend):
+    user = await authorization(session=session, schema=user)
+    return {"detail": user}
 
 
 @router.get("/get/{user_id}/")
