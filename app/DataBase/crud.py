@@ -1,31 +1,57 @@
+# crud/base.py
+from typing import TypeVar, Generic, Type, List
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
-from typing import Optional
+
+ModelType = TypeVar("ModelType")
 
 
-class CRUD:
-    def __init__(self, id: Optional[int], query: Optional[str], session: Optional[str], model: Optional[str]):
-        self.id = id
-        self.query = query
-        self.session = session
+class CRUDBase(Generic[ModelType]):
+    def __init__(self, model: Type[ModelType]):
         self.model = model
 
-    async def get_all_data(self):
-        result = await self.session.execute(
+
+    async def get_all(self, session: AsyncSession) -> List[ModelType]:
+        result = await session.execute(
             select(self.model)
         )
-        data = result.scalars().all()
-        return data
+
+        return result.scalars().all()
 
 
-    async def get_id(self):
-        result = await self.session.execute(
-            select(self.model).where(self.model.id == self.id)
+    async def get_by_id(self, session: AsyncSession, id: int) -> ModelType:
+        result = await session.execute(
+            select(self.model).where(self.model.id == id)
         )
+
+        obj = result.scalar_one_or_none()
+        if obj is None:
+            raise HTTPException(
+                status_code=404, detail=f"{self.model.__name__} not found"
+            )
+        return obj
+
+
+    async def create(self, session: AsyncSession, obj_in: dict) -> ModelType:
+        obj = self.model(**obj_in)
+        session.add(obj)
+        await session.commit()
+        await session.refresh(obj)
+        return obj
         
-        user = result.scalar_one_or_none()
 
-        if user is None:
-            raise HTTPException(status_code=401, detail="User is found")
 
-        return user
+    async def update(self, session: AsyncSession, id: int, obj_in: dict) -> ModelType:
+        obj = await self.get_by_id(session, id)
+        for field, value in obj_in.items():
+            setattr(obj, field, value)
+        await session.commit()
+        await session.refresh(obj)
+        return obj
+
+
+    async def delete(self, session: AsyncSession, id: int) -> None:
+        obj = await self.get_by_id(session, id)
+        await session.delete(obj)
+        await session.commit()
