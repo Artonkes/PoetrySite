@@ -1,13 +1,23 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.Schemas.UsersSchema import UsersRegistration, UsersUpdata
 from app.DataBase.database import SessionDepend
 from app.Servises.users_servises import create, get_by_id, get_all_id, delete, update, authorization
+from app.Servises.auth_servises import get_current_user_for_token
 
 router = APIRouter(
     prefix="/api/users/v1",
     tags=["Users"]
 )
+
+security = HTTPBearer()
+
+
+async def get_current_user(credentails: HTTPAuthorizationCredentials = Depends(security)) -> str:
+    token = credentails.credentials
+    return get_current_user_for_token(token)
+
 
 @router.post("/registration/")
 async def registration(user: UsersRegistration, session: SessionDepend):
@@ -19,6 +29,16 @@ async def registration(user: UsersRegistration, session: SessionDepend):
 async def authorization_user(user: UsersRegistration, session: SessionDepend):
     user = await authorization(session=session, schema=user)
     return {"detail": user}
+
+
+@router.get("/me/")
+async def get_me(current_user: str = Depends(get_current_user)):
+    return {"username": current_user}
+
+
+@router.get("/profile/")
+async def get_profile(session: SessionDepend, current_user: str = Depends(get_current_user)):
+    return {"username": current_user}
 
 
 @router.get("/get/{user_id}/")

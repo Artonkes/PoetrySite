@@ -4,6 +4,7 @@ from jose import jwt, JWTError
 from pwdlib import PasswordHash
 from pwdlib.hashers.argon2 import Argon2Hasher
 from datetime import datetime, timedelta, timezone
+from fastapi import HTTPException, status
 
 
 password_hasher = PasswordHash(
@@ -26,3 +27,27 @@ def create_access_token(data: dict, expires_delt: timedelta | None = None) -> st
     expire = datetime.now(timezone.utc) + (expires_delt or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, secret_key, algorithm=algoritm)
+
+
+def veryfication_access_toke(token: str) -> str:
+    try:
+        payload = jwt.decode(token, secret_key, algorithms=[algoritm])
+        return payload
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validation credentails",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+def get_current_user_for_token(token: str) -> str:
+    payload = veryfication_access_toke(token)
+    username: str = payload.get("sub")
+    if username is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentails",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return username
